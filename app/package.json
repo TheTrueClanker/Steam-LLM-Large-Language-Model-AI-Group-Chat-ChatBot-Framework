@@ -1,0 +1,63 @@
+{
+  "name": "steam-llm-chatbot-gui",
+  "version": "2.0.5",
+  "private": true,
+  "description": "Desktop GUI and installer for the Ollama Steam Chatbot Framework.",
+  "author": "HakaiNoNeko",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "steam-user": "^5.3.0"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "io.github.hakainoneko.steam-llm-chatbot",
+    "productName": "Steam LLM Chatbot",
+    "asar": false,
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../bot.js",
+        "to": "bot/bot.js"
+      },
+      {
+        "from": "../config.txt",
+        "to": "bot/config.txt"
+      },
+      {
+        "from": "../system prompt.txt",
+        "to": "bot/system prompt.txt"
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "artifactName": "SteamLLMChatbot-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Utility",
+      "artifactName": "SteamLLMChatbot-${version}.${ext}"
+    }
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  }
+}

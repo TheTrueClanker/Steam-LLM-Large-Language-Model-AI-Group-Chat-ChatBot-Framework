@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'">
+  <title>Steam LLM Chatbot</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Steam LLM Chatbot</h1>
+    <nav id="tabs">
+      <button data-tab="dashboard" class="active">Dashboard</button>
+      <button data-tab="settings">Settings</button>
+      <button data-tab="prompt">System Prompt</button>
+      <button data-tab="ollama">Ollama</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="dashboard" class="tab active">
+      <div class="row">
+        <span id="status" class="pill stopped">Stopped</span>
+        <button id="startBtn" class="primary">Start bot</button>
+        <button id="stopBtn" disabled>Stop</button>
+        <span class="spacer"></span>
+        <button id="wizardBtn">Setup wizard</button>
+        <button id="folderBtn">Open data folder</button>
+      </div>
+      <pre id="log"></pre>
+      <form id="inputForm" class="row">
+        <input id="botInput" placeholder="Type to the bot console (Steam Guard code, /groupmode alias, ...)" autocomplete="off" disabled>
+        <button id="sendBtn" disabled>Send</button>
+      </form>
+    </section>
+
+    <section id="settings" class="tab">
+      <div id="settingsForm"></div>
+      <div class="row"><button id="saveSettings" class="primary">Save settings</button><span id="settingsMsg" class="msg"></span></div>
+      <p class="hint">Changes apply the next time the bot starts. The Steam password is stored in plain text in config.txt, as the framework has always done.</p>
+    </section>
+
+    <section id="prompt" class="tab">
+      <p class="hint">Edit in plain English. Keep the section names in [BRACKETS]. Masters must be SteamID64 numbers; leave [MASTERS] empty for no master.</p>
+      <textarea id="promptText" spellcheck="false"></textarea>
+      <div class="row"><button id="savePrompt" class="primary">Save prompt</button><span id="promptMsg" class="msg"></span></div>
+    </section>
+
+    <section id="ollama" class="tab">
+      <div class="row">
+        <span id="ollamaStatus" class="pill stopped">Checking...</span>
+        <button id="ollamaRefresh">Refresh</button>
+        <button id="ollamaDownload">Download Ollama</button>
+      </div>
+      <h3>Installed models</h3>
+      <ul id="modelList"></ul>
+      <h3>Pull a model</h3>
+      <form id="pullForm" class="row">
+        <input id="pullName" placeholder="e.g. llama3.2:latest" autocomplete="off">
+        <button class="primary">Pull</button>
+      </form>
+      <progress id="pullBar" max="100" value="0" hidden></progress>
+      <p id="pullMsg" class="msg"></p>
+    </section>
+  </main>
+
+  <div id="wizard" hidden>
+    <div class="card">
+      <div id="wizardStep"></div>
+      <div class="row">
+        <button id="wizBack">Back</button>
+        <span class="spacer"></span>
+        <button id="wizSkip">Skip wizard</button>
+        <button id="wizNext" class="primary">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

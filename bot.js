@@ -6,7 +6,7 @@ const { stdin, stdout } = require("process");
 const fs = require("fs");
 const path = require("path");
 
-const PROJECT_DIR = __dirname;
+const PROJECT_DIR = process.env.STEAM_BOT_DATA_DIR || __dirname;
 const CONFIG_TXT_FILE = path.join(PROJECT_DIR, "config.txt");
 const SYSTEM_PROMPT_FILE = path.join(PROJECT_DIR, "system prompt.txt");
 
