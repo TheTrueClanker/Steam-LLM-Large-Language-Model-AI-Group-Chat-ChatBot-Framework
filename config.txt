@@ -31,6 +31,28 @@ Fast reply model = llama3.2:latest
 Fast timing model = llama3.2:latest
 Memory model = llama3.2:latest
 Safety model = llama-guard3:1b
+# Thinking applies to the reply model only, and only if that model supports it.
+# off = fastest (recommended for chat), on = let it think first, low/medium/high = effort (gpt-oss style models).
+Thinking = off
+# Vision lets the bot look at images people send. If the reply model can see images it is used directly.
+Vision = on
+# Otherwise this model (e.g. bonsai-2:9b or gemma4) describes the image first. Leave blank for none.
+Vision model =
+Max images per message = 3
+# Images are only downloaded from known Steam/Giphy/Imgur/Discord hosts unless this is on.
+Allow any image host = off
+# Memory: how long a model stays loaded in RAM/VRAM after its last use (5m, 30s, 0 = free it right away, -1 = never).
+# Lower it if your computer starts swapping.
+Keep model loaded = 5m
+# Unload the other models before a different one is used, so the reply, timing, memory and vision models never sit in memory together.
+Keep only one model loaded = on
+# Free this bot's models when it exits.
+Unload models on exit = on
+# Context window in tokens (blank = Ollama's default, which on some models is 32768+ and uses a lot of memory). 8192 is plenty for chat.
+Context size = 8192
+# Give up on a stuck model after this many seconds.
+Reply timeout seconds = 180
+Utility timeout seconds = 60
 
 [FEATURES]
 # Memory stores useful conversation facts and recent interactions.
@@ -42,6 +64,33 @@ Friendships = on
 Memory AI = on
 # Lets AI semantic analysis update friendship when Friendships is on.
 Friendship AI = on
+
+[STEAM ACTIONS]
+# Lets the model use Steam chat features by writing small tags in its reply, e.g. [react:steamhappy],
+# [me:waves], [mention:Name], [spoiler:text], [store:APPID]. Turn the master switch off to disable all of them.
+Steam actions = on
+Reactions = on
+# "/me" action lines
+Me actions = on
+# @mentions of people in group chats
+Mentions = on
+Spoilers = on
+Store links = on
+# Lets the bot write :emoticons: in its text (at most one per message). Small models overuse them, so this is off by default.
+# Off removes every emoticon from its messages. Reactions are the separate switch above.
+Emoticons = off
+# Shows "typing..." in DMs while the model is working.
+Typing indicator = on
+
+[GROUPS AND FRIENDS]
+# Auto join groups: off = invites wait in /inbox, masters = join when a master sends the invite, all = join any invite.
+Auto join groups = off
+# Friend requests: ask = DM the masters to accept/deny with /friend (never accepted automatically), ignore = do nothing.
+Friend requests = ask
+# Logs a line at startup when a newer release exists on GitHub.
+Check for updates = on
+# Where releases are read from (owner/repo). Blank = the original project. Forks can put their own repo here.
+Update source =
 
 [REPLY MODES]
 # Group modes: off, alias, smart, all
@@ -69,7 +118,11 @@ Max reply sentences = 3
 [PERFORMANCE]
 Fast mode = off
 Performance mode = on
+# If Steam stays unreachable this long the bot exits so it can be restarted (0 = never).
+Reconnect watchdog minutes = 10
+# Chat and console logs older than this are deleted at startup.
+Log retention days = 30
 
 [CHAT COMMANDS]
-# Prefix used for simple Steam-side commands such as !help and !ask.
+# Prefix for simple Steam-side commands. "!" gives !help and !ask. A word such as "!bot" gives "!bot help" and "!bot ask".
 Chat command prefix = !bot

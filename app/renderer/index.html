@@ -1,21 +1,36 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src data:">
   <title>Steam LLM Chatbot</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
     <h1>Steam LLM Chatbot</h1>
+    <div class="botbar">
+      <select id="botSelect" title="Bot"></select>
+      <button id="botNew" title="Add another bot">+ New</button>
+      <button id="botMenu" title="Rename or delete this bot">...</button>
+    </div>
     <nav id="tabs">
       <button data-tab="dashboard" class="active">Dashboard</button>
+      <button data-tab="chat">Test chat</button>
       <button data-tab="settings">Settings</button>
-      <button data-tab="prompt">System Prompt</button>
+      <button data-tab="prompt">Persona</button>
       <button data-tab="ollama">Ollama</button>
     </nav>
+    <span class="spacer"></span>
+    <select id="themeSelect" title="Theme"></select>
   </header>
+
+  <div id="updateBanner" class="banner" hidden>
+    <span id="updateText"></span>
+    <button id="updateInstall" class="primary" hidden>Download and install</button>
+    <button id="updateOpen">View release</button>
+    <button id="updateDismiss">Later</button>
+  </div>
 
   <main>
     <section id="dashboard" class="tab active">
@@ -23,9 +38,15 @@
         <span id="status" class="pill stopped">Stopped</span>
         <button id="startBtn" class="primary">Start bot</button>
         <button id="stopBtn" disabled>Stop</button>
+        <span id="runningInfo" class="hint"></span>
         <span class="spacer"></span>
         <button id="wizardBtn">Setup wizard</button>
         <button id="folderBtn">Open data folder</button>
+      </div>
+      <div class="row opts">
+        <label class="inline"><input type="checkbox" id="optAutostart"> Start this bot when the app opens</label>
+        <label class="inline"><input type="checkbox" id="optTray"> Keep running in the tray when the window is closed</label>
+        <label class="inline"><input type="checkbox" id="optLogin"> Open the app when I log in</label>
       </div>
       <pre id="log"></pre>
       <form id="inputForm" class="row">
@@ -34,16 +55,48 @@
       </form>
     </section>
 
+    <section id="chat" class="tab">
+      <div class="row">
+        <span id="chatInfo" class="hint">Talk to this bot right here. It uses the saved persona and settings, but never logs into Steam or touches memory.</span>
+        <span class="spacer"></span>
+        <label class="inline">As <select id="chatKind"><option value="dm">a DM</option><option value="group">a group chat</option></select></label>
+        <label class="inline">Name <input id="chatSender" value="Tester" size="10" autocomplete="off"></label>
+        <button id="chatReset">Clear chat</button>
+      </div>
+      <div id="chatLog"></div>
+      <div id="chatAttach" class="row" hidden></div>
+      <form id="chatForm" class="row">
+        <input id="chatFile" type="file" accept="image/*" multiple hidden>
+        <button type="button" id="chatImg" title="Attach an image">Image</button>
+        <input id="chatInput" placeholder="Say something to the bot..." autocomplete="off">
+        <button class="primary" id="chatSend">Send</button>
+      </form>
+      <details><summary>Behind the scenes</summary><pre id="chatDebug"></pre></details>
+    </section>
+
     <section id="settings" class="tab">
       <div id="settingsForm"></div>
       <div class="row"><button id="saveSettings" class="primary">Save settings</button><span id="settingsMsg" class="msg"></span></div>
       <p class="hint">Changes apply the next time the bot starts. The Steam password is stored in plain text in config.txt, as the framework has always done.</p>
+      <datalist id="modelOptions"></datalist>
     </section>
 
     <section id="prompt" class="tab">
       <p class="hint">Edit in plain English. Keep the section names in [BRACKETS]. Masters must be SteamID64 numbers; leave [MASTERS] empty for no master.</p>
+      <details id="aiBox" open>
+        <summary>Write the persona with an installed model</summary>
+        <div class="aiPanel">
+          <textarea id="aiIdea" rows="3" placeholder="Describe the character (e.g. 'a grumpy dwarf blacksmith who loves Deep Rock Galactic'). Leave empty and press Improve to polish the current persona."></textarea>
+          <div class="row">
+            <label class="inline">Model <input id="aiModel" list="modelOptions" placeholder="uses the Reply model" autocomplete="off"></label>
+            <button id="aiGenerate" class="primary">Generate new</button>
+            <button id="aiEnhance">Improve current</button>
+            <span id="aiMsg" class="msg"></span>
+          </div>
+        </div>
+      </details>
       <textarea id="promptText" spellcheck="false"></textarea>
-      <div class="row"><button id="savePrompt" class="primary">Save prompt</button><span id="promptMsg" class="msg"></span></div>
+      <div class="row"><button id="savePrompt" class="primary">Save persona</button><span id="promptMsg" class="msg"></span></div>
     </section>
 
     <section id="ollama" class="tab">
@@ -56,7 +109,7 @@
       <ul id="modelList"></ul>
       <h3>Pull a model</h3>
       <form id="pullForm" class="row">
-        <input id="pullName" placeholder="e.g. llama3.2:latest" autocomplete="off">
+        <input id="pullName" placeholder="e.g. llama3.2:latest (vision: bonsai-2:9b)" autocomplete="off">
         <button class="primary">Pull</button>
       </form>
       <progress id="pullBar" max="100" value="0" hidden></progress>
@@ -73,6 +126,14 @@
         <button id="wizSkip">Skip wizard</button>
         <button id="wizNext" class="primary">Next</button>
       </div>
+    </div>
+  </div>
+
+  <div id="botDialog" hidden>
+    <div class="card">
+      <h2 id="botDialogTitle"></h2>
+      <div id="botDialogBody" class="step"></div>
+      <div class="row"><span class="spacer"></span><button id="botDialogCancel">Cancel</button><button id="botDialogOk" class="primary">OK</button></div>
     </div>
   </div>
 

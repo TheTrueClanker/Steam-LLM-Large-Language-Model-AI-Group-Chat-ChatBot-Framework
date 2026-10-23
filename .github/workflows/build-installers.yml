@@ -5,7 +5,7 @@ on:
   push:
     tags: ["v*"]
   pull_request:
-    paths: ["app/**", "bot.js", ".github/workflows/build-installers.yml"]
+    paths: ["app/**", "bot.js", "lib/**", ".github/workflows/build-installers.yml"]
 
 jobs:
   build:
@@ -30,3 +30,22 @@ jobs:
             app/dist/*.exe
             app/dist/*.AppImage
           if-no-files-found: error
+
+  # On a v* tag, publish the installers as a GitHub release. The desktop app's update check reads these.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/*.AppImage
+          generate_release_notes: true

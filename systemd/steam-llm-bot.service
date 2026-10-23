@@ -1,0 +1,16 @@
+# Run the bot without the desktop app (Linux). Copy to ~/.config/systemd/user/, edit the paths, then:
+#   systemctl --user daemon-reload && systemctl --user enable --now steam-llm-bot
+# A first login that needs a Steam Guard code cannot be answered here; do that once from a terminal
+# (node bot.js) so the bot saves its login token, then let systemd take over.
+[Unit]
+Description=Steam LLM chatbot
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/steam-llm-bot
+ExecStart=/usr/bin/node bot.js
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

@@ -1,6 +1,6 @@
 {
   "name": "steam-llm-chatbot-gui",
-  "version": "2.0.5",
+  "version": "2.2.0",
   "private": true,
   "description": "Desktop GUI and installer for the Ollama Steam Chatbot Framework.",
   "author": "HakaiNoNeko",
@@ -19,16 +19,22 @@
   "build": {
     "appId": "io.github.hakainoneko.steam-llm-chatbot",
     "productName": "Steam LLM Chatbot",
+    "icon": "icon.png",
     "asar": false,
     "files": [
       "main.js",
       "preload.js",
+      "icon.png",
       "renderer/**"
     ],
     "extraResources": [
       {
         "from": "../bot.js",
         "to": "bot/bot.js"
+      },
+      {
+        "from": "../lib",
+        "to": "bot/lib"
       },
       {
         "from": "../config.txt",

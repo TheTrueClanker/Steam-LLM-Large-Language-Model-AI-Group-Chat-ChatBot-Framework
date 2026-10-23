@@ -1,30 +1,46 @@
-:root { --bg: #14161c; --panel: #1d2029; --line: #2c303c; --text: #e6e8ee; --muted: #8b90a0; --accent: #5aa9ff; --ok: #4cc38a; --bad: #ef6b73; }
+:root, [data-theme="dark"] { --bg: #14161c; --panel: #1d2029; --line: #2c303c; --text: #e6e8ee; --muted: #8b90a0; --accent: #5aa9ff; --on-accent: #06121f; --ok: #4cc38a; --bad: #ef6b73; --log-bg: #0d0f14; --bubble-user: #263248; --bubble-bot: #1d2029; }
+[data-theme="light"] { --bg: #f4f5f8; --panel: #ffffff; --line: #d9dce5; --text: #1b1f2a; --muted: #6a7084; --accent: #2f6fe4; --on-accent: #ffffff; --ok: #1f9d68; --bad: #d1424b; --log-bg: #fbfbfd; --bubble-user: #dce8ff; --bubble-bot: #ffffff; }
+[data-theme="steam"] { --bg: #171a21; --panel: #1b2838; --line: #2a475e; --text: #c7d5e0; --muted: #8f98a0; --accent: #66c0f4; --on-accent: #0e1b26; --ok: #a4d007; --bad: #e24b4b; --log-bg: #101822; --bubble-user: #2a475e; --bubble-bot: #1b2838; }
+[data-theme="catboy"] { --bg: #0b1020; --panel: #121a33; --line: #22305a; --text: #e8f1ff; --muted: #8aa0d0; --accent: #36e6ff; --on-accent: #02121a; --ok: #5dffb0; --bad: #ff6b9a; --log-bg: #070b17; --bubble-user: #1c2c5a; --bubble-bot: #121a33; }
+[data-theme="fergus"] { --bg: #14171a; --panel: #24292e; --line: #8b959e; --text: #ffffff; --muted: #c2c9cf; --accent: #ff6a00; --on-accent: #1a0b02; --ok: #a3d46f; --bad: #ff5d55; --log-bg: #0b0d0f; --bubble-user: #62300f; --bubble-bot: #30363b; }
+[data-theme="sakura"] { --bg: #fff5f8; --panel: #ffffff; --line: #f1cfdb; --text: #3a2230; --muted: #9a6f84; --accent: #e8588c; --on-accent: #ffffff; --ok: #2f9e6e; --bad: #c8324c; --log-bg: #fffafb; --bubble-user: #ffe0eb; --bubble-bot: #ffffff; }
+[data-theme="contrast"] { --bg: #000000; --panel: #0a0a0a; --line: #ffffff; --text: #ffffff; --muted: #d0d0d0; --accent: #ffd400; --on-accent: #000000; --ok: #00ff7f; --bad: #ff5050; --log-bg: #000000; --bubble-user: #1a1a1a; --bubble-bot: #000000; }
+
 * { box-sizing: border-box; }
 body { margin: 0; height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--text); font: 14px system-ui, sans-serif; }
-header { display: flex; align-items: center; gap: 24px; padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header { display: flex; align-items: center; gap: 16px; padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+[data-theme="fergus"] header { background: linear-gradient(180deg, #343b41, var(--panel)); border-bottom: 2px solid var(--accent); }
 h1 { font-size: 16px; margin: 0; }
 h3 { margin: 18px 0 8px; font-size: 14px; }
+.botbar { display: flex; gap: 4px; align-items: center; }
+.botbar select { width: 170px; }
+header select#themeSelect { width: 130px; }
 nav { display: flex; gap: 4px; }
 nav button { background: none; border: 0; color: var(--muted); }
 nav button.active { color: var(--text); background: var(--line); }
 main { flex: 1; min-height: 0; padding: 16px 18px; overflow: auto; }
 .tab { display: none; }
 .tab.active { display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
-#dashboard.active { height: 100%; }
+#dashboard.active, #chat.active { height: 100%; }
 .row { display: flex; align-items: center; gap: 8px; }
 .spacer { flex: 1; }
 button { padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; }
+[data-theme="fergus"] button, [data-theme="fergus"] input, [data-theme="fergus"] select, [data-theme="fergus"] textarea, [data-theme="fergus"] .card { box-shadow: inset 0 1px 0 rgba(255,255,255,.09); }
 button:hover:not(:disabled) { border-color: var(--accent); }
 button:disabled { opacity: .45; cursor: default; }
-button.primary { background: var(--accent); border-color: var(--accent); color: #06121f; font-weight: 600; }
+button.danger { color: var(--bad); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 input, select, textarea { width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; }
 input[type=checkbox] { width: auto; }
+label.inline { display: flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--muted); }
+label.inline input, label.inline select { width: auto; }
 textarea { flex: 1; min-height: 340px; resize: vertical; font-family: ui-monospace, monospace; }
-pre#log { flex: 1; min-height: 0; margin: 0; padding: 10px; overflow: auto; white-space: pre-wrap; word-break: break-word; background: #0d0f14; border: 1px solid var(--line); border-radius: 6px; font: 12px ui-monospace, monospace; }
+pre#log, pre#chatDebug { flex: 1; min-height: 0; margin: 0; padding: 10px; overflow: auto; white-space: pre-wrap; word-break: break-word; background: var(--log-bg); border: 1px solid var(--line); border-radius: 6px; font: 12px ui-monospace, monospace; }
+pre#chatDebug { max-height: 180px; margin-top: 8px; }
 .pill { padding: 3px 10px; border-radius: 999px; font-size: 12px; background: var(--line); }
-.pill.running, .pill.ok { background: rgba(76,195,138,.2); color: var(--ok); }
+.pill.running, .pill.ok { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
 .pill.stopped { color: var(--muted); }
-.pill.bad { background: rgba(239,107,115,.2); color: var(--bad); }
+.pill.bad { background: color-mix(in srgb, var(--bad) 22%, transparent); color: var(--bad); }
 fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 14px; padding: 10px 14px 4px; }
 legend { padding: 0 6px; color: var(--accent); }
 .field { display: grid; grid-template-columns: 220px 1fr; gap: 4px 12px; align-items: center; margin-bottom: 10px; }
@@ -33,9 +49,30 @@ legend { padding: 0 6px; color: var(--accent); }
 .msg.ok { color: var(--ok); } .msg.bad { color: var(--bad); }
 ul { margin: 0; padding-left: 20px; }
 progress { width: 100%; }
-#wizard { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.65); }
-#wizard[hidden] { display: none; }
+details summary { cursor: pointer; color: var(--muted); }
+.aiPanel { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.aiPanel textarea { min-height: 0; flex: none; font-family: inherit; }
+#wizard, #botDialog { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.65); }
+#wizard[hidden], #botDialog[hidden] { display: none; }
 .card { width: min(560px, 92vw); max-height: 92vh; overflow: auto; padding: 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; gap: 14px; }
 .card h2 { margin: 0; font-size: 18px; }
 .card .step { display: flex; flex-direction: column; gap: 10px; }
 .card textarea { min-height: 200px; }
+
+/* test chat */
+#chatLog { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--log-bg); border: 1px solid var(--line); border-radius: 8px; }
+.bubble { max-width: 78%; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); white-space: pre-wrap; word-break: break-word; }
+.bubble.user { align-self: flex-end; background: var(--bubble-user); }
+.bubble.bot { align-self: flex-start; background: var(--bubble-bot); }
+.bubble.sys { align-self: center; max-width: 100%; border: 0; background: none; color: var(--muted); font-size: 12px; }
+.bubble .who { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+.bubble img { display: block; max-width: 220px; max-height: 160px; border-radius: 8px; margin-bottom: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--line); color: var(--muted); }
+.thumb { position: relative; }
+.thumb img { height: 44px; border-radius: 6px; border: 1px solid var(--line); }
+
+.banner { display: flex; align-items: center; gap: 10px; padding: 8px 18px; background: color-mix(in srgb, var(--accent) 18%, var(--panel)); border-bottom: 1px solid var(--line); }
+.banner[hidden] { display: none; }
+.banner span { flex: 1; }
+.opts { flex-wrap: wrap; gap: 16px; }
