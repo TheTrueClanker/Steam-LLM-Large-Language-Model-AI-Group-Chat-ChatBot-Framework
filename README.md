@@ -205,7 +205,7 @@ Reactions rely on internal `steam-user` protocol support because the library has
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `Keep model loaded` | `5m` | Ollama keep-alive duration; use `0` to unload immediately or `-1` to keep loaded. |
-| `Keep only one model loaded` | `on` | Unload the previous framework model before switching to another. |
+| `Model memory limit` | `auto` | Most memory the bot's models may use together: `auto` (half of this computer's RAM), a number of GB, or `off`. Models that fit stay loaded; when a new one does not fit, the least recently used one is unloaded. |
 | `Unload models on exit` | `on` | Release this bot's models during graceful shutdown. |
 | `Context size` | `8192` | Caps context memory use; blank uses the model/Ollama default. |
 | `Reply timeout seconds` | `180` | Stops a stuck reply generation. |
@@ -213,7 +213,7 @@ Reactions rely on internal `steam-user` protocol support because the library has
 | `Reconnect watchdog minutes` | `10` | Exit after prolonged Steam disconnection so a service manager can restart it; `0` disables it. |
 | `Log retention days` | `30` | Delete older chat and console logs at startup. |
 
-Keeping one model loaded at a time and limiting context prevents reply, timing, memory, safety, and vision models from accumulating in RAM/VRAM and spilling into swap. A single model that is too large for the machine can still cause swapping; lower the context, use `Keep model loaded = 0`, or choose a smaller model.
+The memory limit and the context cap stop the reply, timing, memory, safety, and vision models from piling up in RAM/VRAM and spilling into swap. Models that fit under the limit stay loaded together, so they are not unloaded and reloaded on every turn (each reload is a multi-GB read and a burst of memory churn). A single model that is too large for the machine can still cause swapping; lower the context, lower `Model memory limit`, use `Keep model loaded = 0`, or choose a smaller model.
 
 ### Groups, Friends, and Updates
 
@@ -364,7 +364,7 @@ Make the file executable. If Electron reports a sandbox or user-namespace error,
 
 ### RAM or Swap Usage Is Too High
 
-Keep `Keep only one model loaded = on`, lower `Context size`, set `Keep model loaded = 0`, and verify that the selected model itself fits in available RAM/VRAM.
+Set `Model memory limit` to a number of GB your computer can spare (for example `8`), lower `Context size`, set `Keep model loaded = 0`, and verify that the selected model itself fits in available RAM/VRAM.
 
 ### A Steam Action Does Not Appear
 

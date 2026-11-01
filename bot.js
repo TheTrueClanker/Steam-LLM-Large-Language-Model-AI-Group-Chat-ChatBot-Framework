@@ -260,10 +260,21 @@ const VISION_MODEL = String(humanConfig("Vision model", "")).trim();
 const VISION_MAX_IMAGES = Math.max(1, Number(humanConfig("Max images per message", 3)) || 3);
 const VISION_ALLOW_ANY_HOST = humanConfigBool("Allow any image host", false);
 const OLLAMA_NUM_CTX = Number(humanConfig("Context size", "")) || 0;
+// "Model memory limit": auto = half of this computer's RAM when Ollama runs here (unlimited for a remote Ollama),
+// a number = that many GB, off/0 = never unload models to make room.
+function resolveModelMemoryLimitBytes() {
+  const raw = String(humanConfig("Model memory limit", "auto")).trim().toLowerCase();
+  if (["off", "no", "false", "none", "0"].includes(raw)) return 0;
+  const gb = Number(raw.replace(/gb?$/, ""));
+  if (raw && raw !== "auto" && Number.isFinite(gb) && gb > 0) return Math.round(gb * 1024 ** 3);
+  let host = "";
+  try { host = new URL(OLLAMA_URL).hostname; } catch {}
+  return ["127.0.0.1", "localhost", "[::1]", "::1"].includes(host) ? Math.round(require("os").totalmem() * 0.5) : 0;
+}
 const ollama = createOllama({
   numCtx: OLLAMA_NUM_CTX,
   keepAlive: String(humanConfig("Keep model loaded", "5m")).trim() || "5m",
-  onlyOne: humanConfigBool("Keep only one model loaded", true),
+  memoryLimitBytes: resolveModelMemoryLimitBytes(),
   url: OLLAMA_URL,
   log: (...parts) => logConsole(...parts),
   defaultTimeoutMs: OLLAMA_REPLY_TIMEOUT_MS

@@ -14,8 +14,7 @@ The problem was caused by the bot using several Ollama models—reply, timing, m
 
 The framework now:
 
-- Keeps only one Ollama model resident at a time by default.
-- Unloads the previous model before switching models.
+- Keeps the bot's models under a memory budget (`Model memory limit`, default half of the computer's RAM) and unloads only the least recently used model when a new one does not fit. An earlier "one model at a time" rule unloaded and reloaded the reply model around every safety check (about four multi-GB loads per turn) and caused swap churn on every message; models that fit together now stay loaded.
 - Unloads the bot's models when the bot exits.
 - Sets an 8192-token default context instead of potentially using Ollama's much larger model default.
 - Stops idle desktop test-chat processes after ten minutes.
@@ -191,7 +190,6 @@ There are 25 new configuration entries:
 
 - Vision
 - Arbitrary image hosts
-- Keep only one model loaded
 - Unload models on exit
 - Entire Steam-actions system
 - Reactions
@@ -209,6 +207,7 @@ There are 25 new configuration entries:
 - Vision model
 - Maximum images per message
 - Model keep-alive duration
+- Model memory limit
 - Context size
 - Reply timeout
 - Utility timeout
@@ -225,7 +224,7 @@ There are 25 new configuration entries:
 | Thinking | `off` |
 | Vision | `on` |
 | Arbitrary image hosts | `off` |
-| Keep only one model loaded | `on` |
+| Model memory limit | `auto` |
 | Unload models on exit | `on` |
 | Context size | `8192` |
 | Steam actions | `on` |
