@@ -90,7 +90,10 @@ test("extractInvites and isNewer", () => {
   assert.equal(isNewer("2.0.10", "2.0.9"), true);
 });
 
-test("only one model stays loaded, keep_alive is always sent, unloadAll frees everything", async () => {
+test("models that fit stay loaded; only the least recently used is evicted when one does not fit", async () => {
+  const GB = 1024 ** 3;
+  const disk = { a: 4 * GB, b: 1 * GB, c: 4 * GB };
+  const resident = new Set(); // what the fake Ollama has loaded
   const calls = [];
   const server = http.createServer((req, res) => {
     let body = "";
@@ -99,26 +102,57 @@ test("only one model stays loaded, keep_alive is always sent, unloadAll frees ev
       const json = JSON.parse(body || "{}");
       res.setHeader("content-type", "application/json");
       if (req.url === "/api/show") return res.end(JSON.stringify({ capabilities: ["completion"] }));
-      calls.push({ model: json.model, keep_alive: json.keep_alive, num_ctx: json.options?.num_ctx, prompt: json.prompt });
+      if (req.url === "/api/tags") return res.end(JSON.stringify({ models: Object.entries(disk).map(([name, size]) => ({ name: name + ":latest", size })) }));
+      if (req.url === "/api/ps") return res.end(JSON.stringify({ models: [...resident].map(name => ({ name: name + ":latest", size: disk[name] })) }));
+      const name = json.model;
+      if (String(json.keep_alive) === "0") resident.delete(name);
+      else resident.add(name);
+      calls.push({ model: name, keep_alive: json.keep_alive, num_ctx: json.options?.num_ctx });
       res.end(JSON.stringify({ response: "ok" }));
     });
   });
   await new Promise(r => server.listen(0, "127.0.0.1", r));
-  const ollama = createOllama({ url: `http://127.0.0.1:${server.address().port}`, keepAlive: "2m", numCtx: 4096 });
+  const ollama = createOllama({ url: `http://127.0.0.1:${server.address().port}`, keepAlive: "2m", numCtx: 4096, memoryLimitBytes: 9 * GB });
 
   await ollama.generate({ model: "a", prompt: "x" });
-  await ollama.generate({ model: "a", prompt: "x" });
-  assert.deepEqual(calls.map(c => c.model), ["a", "a"]); // same model: no unload
   assert.equal(calls[0].keep_alive, "2m");
   assert.equal(calls[0].num_ctx, 4096);
 
-  await ollama.generate({ model: "b", prompt: "x" });
-  assert.deepEqual(calls.slice(2).map(c => [c.model, c.keep_alive]), [["a", 0], ["b", "2m"]]); // a unloaded first
-  assert.deepEqual(ollama.loadedModels(), ["b"]);
+  // a (4GB) + b (1GB) fit in 9GB: alternating between them never unloads or reloads anything
+  for (const m of ["b", "a", "b", "a"]) await ollama.generate({ model: m, prompt: "x" });
+  assert.ok(calls.every(c => c.keep_alive !== 0 && c.keep_alive !== "0"), "nothing was unloaded");
+  assert.deepEqual(ollama.loadedModels().sort(), ["a", "b"]);
+
+  // c (4GB x1.1) does not fit next to a + b (9.4GB > 9GB): the least recently used one (b) is evicted, a stays
+  await ollama.generate({ model: "c", prompt: "x" });
+  const evicted = calls.filter(c => c.keep_alive === 0).map(c => c.model);
+  assert.deepEqual(evicted, ["b"]);
+  assert.deepEqual(ollama.loadedModels().sort(), ["a", "c"]);
 
   await ollama.unloadAll();
-  assert.equal(calls.at(-1).keep_alive, 0);
   assert.deepEqual(ollama.loadedModels(), []);
+  server.closeAllConnections();
+  server.close();
+});
+
+test("without a memory limit nothing is ever unloaded to make room", async () => {
+  const calls = [];
+  const server = http.createServer((req, res) => {
+    let body = "";
+    req.on("data", c => (body += c));
+    req.on("end", () => {
+      const json = JSON.parse(body || "{}");
+      res.setHeader("content-type", "application/json");
+      if (req.url === "/api/show") return res.end(JSON.stringify({ capabilities: ["completion"] }));
+      calls.push(json.keep_alive);
+      res.end(JSON.stringify({ response: "ok" }));
+    });
+  });
+  await new Promise(r => server.listen(0, "127.0.0.1", r));
+  const ollama = createOllama({ url: `http://127.0.0.1:${server.address().port}` });
+  await ollama.generate({ model: "a", prompt: "x" });
+  await ollama.generate({ model: "b", prompt: "x" });
+  assert.deepEqual(calls, ["5m", "5m"]);
   server.closeAllConnections();
   server.close();
 });

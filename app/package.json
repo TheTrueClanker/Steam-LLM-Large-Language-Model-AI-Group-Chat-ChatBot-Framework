@@ -1,6 +1,6 @@
 {
   "name": "steam-llm-chatbot-gui",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "private": true,
   "description": "Desktop GUI and installer for the Ollama Steam Chatbot Framework.",
   "author": "HakaiNoNeko",

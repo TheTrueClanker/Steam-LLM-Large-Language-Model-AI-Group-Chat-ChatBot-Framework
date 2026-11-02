@@ -44,8 +44,10 @@ Allow any image host = off
 # Memory: how long a model stays loaded in RAM/VRAM after its last use (5m, 30s, 0 = free it right away, -1 = never).
 # Lower it if your computer starts swapping.
 Keep model loaded = 5m
-# Unload the other models before a different one is used, so the reply, timing, memory and vision models never sit in memory together.
-Keep only one model loaded = on
+# Most memory the bot's models may use together: auto (half of this computer's RAM), a number of GB (e.g. 12), or off.
+# Models that fit stay loaded, so replies are fast and nothing is reloaded every turn. When a new model does not fit,
+# the one used longest ago is unloaded. Lower it if your computer swaps.
+Model memory limit = auto
 # Free this bot's models when it exits.
 Unload models on exit = on
 # Context window in tokens (blank = Ollama's default, which on some models is 32768+ and uses a lot of memory). 8192 is plenty for chat.
