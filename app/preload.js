@@ -30,6 +30,8 @@ contextBridge.exposeInMainWorld("api", {
   chatStop: invoke("chat:stop"),
   ollamaTags: invoke("ollama:tags"),
   ollamaPull: invoke("ollama:pull"),
+  ollamaLoaded: invoke("ollama:loaded"),
+  ollamaFree: invoke("ollama:free"),
   personaGenerate: invoke("persona:generate"),
   personaMerge: invoke("persona:merge"),
   onLog: subscribe("bot:log"),

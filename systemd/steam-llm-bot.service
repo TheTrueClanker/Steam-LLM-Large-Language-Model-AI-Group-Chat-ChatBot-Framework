@@ -8,7 +8,9 @@ After=network-online.target
 
 [Service]
 WorkingDirectory=%h/steam-llm-bot
-ExecStart=/usr/bin/node bot.js
+ExecStart=/usr/bin/node --max-old-space-size=512 bot.js
+# The bot process itself never needs much; this stops it ever taking more (models live in Ollama, not here).
+MemoryMax=1G
 Restart=on-failure
 RestartSec=30
 

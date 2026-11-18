@@ -47,7 +47,7 @@ if [ ! -f "node_modules/steam-user/package.json" ]; then
 fi
 
 printf "Starting bot...\n"
-node bot.js
+node --max-old-space-size=512 bot.js
 BOT_EXIT=$?
 
 # Exit code 20 means bot.js already displayed the Steam setup/login

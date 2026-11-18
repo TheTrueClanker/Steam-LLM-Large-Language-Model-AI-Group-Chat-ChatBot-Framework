@@ -8,20 +8,23 @@ Moto's current upstream already contains the README cleanup and the original v2.
 
 ## SWAP and Memory Issue
 
-**The identified SWAP issue is fixed at the code level.**
+**v2.2.2 makes the memory limit a real hard cap.** Moto reported (Kubuntu) that the limiter did not hold and the PC was crippled. What was wrong in v2.2.1:
 
-The problem was caused by the bot using several Ollama models—reply, timing, memory, safety, and vision—while leaving each model loaded for Ollama's default keep-alive period. Multiple models could accumulate in RAM/VRAM and spill into swap.
+- The limit only unloaded the bot's *own* models before loading another one. A single model bigger than the limit still loaded, models other programs (or the test chat, which is a separate process) had loaded were ignored, and the size check used the file size on disk, which misses the context window.
+- Old config files have no `Context size` line, so the "8192 default" only applied to fresh installs; everyone else got Ollama's default (32768 on many models), several GB more per model.
+- Several requests could check the budget at the same moment and all decide they fit.
+- A bad value like `Model memory limit = 4096MB` silently fell back to auto.
+- If the desktop app crashed or was killed, bots it started kept running with no window to stop them.
 
-The framework now:
+What v2.2.2 does:
 
-- Keeps the bot's models under a memory budget (`Model memory limit`, default half of the computer's RAM) and unloads only the least recently used model when a new one does not fit. An earlier "one model at a time" rule unloaded and reloaded the reply model around every safety check (about four multi-GB loads per turn) and caused swap churn on every message; models that fit together now stay loaded.
-- Unloads the bot's models when the bot exits.
-- Sets an 8192-token default context instead of potentially using Ollama's much larger model default.
-- Stops idle desktop test-chat processes after ten minutes.
-- Does not retain multi-megabyte base64 images in conversation state.
-- Sends an explicit `keep_alive` value with every generation request.
-
-This behavior has automated coverage. It prevents the specific multi-model accumulation bug, although one individually oversized model can still cause swapping. For aggressive memory conservation, set `Keep model loaded = 0`, lower `Context size`, or use a smaller model.
+- `Model memory limit` (default auto = 35% of RAM) counts everything Ollama has loaded, measured from `/api/ps` (weights + context, RAM only, GPU memory excluded). Before a load, least recently used models are unloaded (the bot's own first, then any others); a model too big on its own is refused with a console message; after each request the real footprint is checked and the model is unloaded if it went over.
+- New `Low memory guard` (default auto = 10% of RAM, at least 1 GB): when free memory drops below it, the bot unloads its models and refuses new model calls until memory frees up.
+- Loads are serialized while a limit is on. Limits accept `6`, `6GB`, `512MB`, `25%`, `auto`, `off`; anything else logs a warning.
+- `Context size` defaults to 8192 in code when the line is missing. `Keep model loaded` default is now 2m.
+- The bot process runs with `--max-old-space-size=512` (desktop app, start scripts, systemd template, which also gets `MemoryMax=1G`).
+- Bots started by the desktop app stop themselves when the app goes away. The playground `/exit` unloads models too.
+- The app shows a one-time notice when closing the window leaves it running in the tray, and the Ollama tab lists what is loaded (RAM/GPU) with a "Free model memory" button and a note that Ollama is its own service that starts at boot on Linux (`sudo systemctl disable --now ollama` to stop that).
 
 ## 1. Ollama, Model, and Image Improvements
 

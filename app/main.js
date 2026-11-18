@@ -1,6 +1,6 @@
 "use strict";
 
-const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification } = require("electron");
 const os = require("os");
 const { spawn } = require("child_process");
 const fs = require("fs");
@@ -22,6 +22,7 @@ const UI_FILE = path.join(USER_DIR, "ui.json");
 let win = null;
 let tray = null;
 let quitting = false;
+let trayNoticeShown = false;
 const procs = new Map(); // bot id -> running bot.js
 const chats = new Map(); // bot id -> test-chat process (bot.js --playground)
 
@@ -100,10 +101,14 @@ function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
+// The bot process itself stays small (well under 200 MB); cap its heap so a bug can never let it eat the computer.
+const BOT_NODE_FLAGS = ["--max-old-space-size=512"];
+
 function botEnv(dir) {
   return {
     ...process.env,
     ELECTRON_RUN_AS_NODE: "1",
+    STEAM_BOT_GUI: "1",
     STEAM_BOT_DATA_DIR: dir,
     NODE_PATH: path.join(__dirname, "node_modules"),
   };
@@ -272,7 +277,7 @@ function startBot(id) {
     }
   }
 
-  const bot = spawn(process.execPath, [path.join(BOT_SRC, "bot.js")], { cwd: dir, env: botEnv(dir) });
+  const bot = spawn(process.execPath, [...BOT_NODE_FLAGS, path.join(BOT_SRC, "bot.js")], { cwd: dir, env: botEnv(dir) });
   procs.set(id, bot);
   bot.stdin.on("error", () => {}); // EPIPE if the bot exits between our write and its close
   let closePressed = false;
@@ -313,7 +318,7 @@ function startChat(id) {
   if (chats.has(id)) return chats.get(id);
   const dir = botDir(id);
   ensureData(dir);
-  const proc = spawn(process.execPath, [path.join(BOT_SRC, "bot.js"), "--playground"], { cwd: dir, env: botEnv(dir) });
+  const proc = spawn(process.execPath, [...BOT_NODE_FLAGS, path.join(BOT_SRC, "bot.js"), "--playground"], { cwd: dir, env: botEnv(dir) });
   const chat = { proc };
   chats.set(id, chat);
   proc.stdin.on("error", () => {});
@@ -356,6 +361,26 @@ ipcMain.handle("ollama:tags", async (_e, url) => {
     const res = await fetch(new URL("/api/tags", url), { signal: AbortSignal.timeout(3000) });
     const json = await res.json();
     return { ok: true, models: (json.models || []).map((m) => m.name) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+// What Ollama has loaded and how much RAM it takes. Ollama is its own background program (on Linux its installer
+// adds a system service that starts with the computer), so this is shown separately from the bots.
+ipcMain.handle("ollama:loaded", async (_e, url) => {
+  try {
+    const res = await fetch(new URL("/api/ps", url), { signal: AbortSignal.timeout(3000) });
+    const json = await res.json();
+    return { ok: true, models: (json.models || []).map((m) => ({ name: m.name || m.model, ram: Math.max(0, (m.size || 0) - (m.size_vram || 0)), vram: m.size_vram || 0 })) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+ipcMain.handle("ollama:free", async (_e, url) => {
+  try {
+    const n = await lib("ollama").createOllama({ url }).unloadEverything();
+    return { ok: true, freed: n };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -438,6 +463,10 @@ function createWindow() {
     if (quitting || !tray || readUi().closeToTray === false) return;
     e.preventDefault();
     win.hide();
+    if (!trayNoticeShown && Notification.isSupported()) {
+      trayNoticeShown = true;
+      new Notification({ title: "Steam LLM Chatbot is still running", body: procs.size ? "Your bots keep running in the tray. Right-click the tray icon and choose Quit to stop everything." : "It is in the tray. Right-click the tray icon and choose Quit to close it completely." }).show();
+    }
   });
 }
 
