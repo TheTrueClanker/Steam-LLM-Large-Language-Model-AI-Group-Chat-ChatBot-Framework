@@ -167,16 +167,26 @@ ipcMain.handle("link:open", (_e, url) => {
 
 /* ---------- UI preferences (theme, background behaviour) ---------- */
 const readUi = () => { try { return JSON.parse(fs.readFileSync(UI_FILE, "utf8")); } catch { return {}; } };
-ipcMain.handle("ui:get", () => ({ closeToTray: true, ...readUi() }));
+// Nothing runs in the background unless the user turned it on: the tray and login options default to off.
+const keepInTray = () => readUi().closeToTray === true;
+ipcMain.handle("ui:get", () => ({ ...readUi(), closeToTray: keepInTray(), launchAtLogin: loginEntryExists() }));
 ipcMain.handle("ui:set", (_e, patch) => {
   fs.writeFileSync(UI_FILE, JSON.stringify({ ...readUi(), ...patch }));
   if ("launchAtLogin" in patch) setLaunchAtLogin(!!patch.launchAtLogin);
 });
 
 // Windows/macOS use Electron's login items; Linux uses an XDG autostart entry.
+const LOGIN_FILE = path.join(os.homedir(), ".config", "autostart", "steam-llm-chatbot.desktop");
+function loginEntryExists() {
+  if (process.platform === "linux") {
+    // Desktop settings may switch an entry off without deleting it; treat that as off.
+    try { return !/^(Hidden\s*=\s*true|X-GNOME-Autostart-enabled\s*=\s*false)\s*$/im.test(fs.readFileSync(LOGIN_FILE, "utf8")); } catch { return false; }
+  }
+  return app.getLoginItemSettings({ args: ["--hidden"] }).openAtLogin;
+}
 function setLaunchAtLogin(on) {
   if (process.platform === "linux") {
-    const file = path.join(os.homedir(), ".config", "autostart", "steam-llm-chatbot.desktop");
+    const file = LOGIN_FILE;
     if (!on) return fs.rmSync(file, { force: true });
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const exe = process.env.APPIMAGE || process.execPath;
@@ -460,7 +470,7 @@ function createWindow() {
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
   // Closing the window keeps the bots running in the tray (turn off in the header menu).
   win.on("close", (e) => {
-    if (quitting || !tray || readUi().closeToTray === false) return;
+    if (quitting || !tray || !keepInTray()) return;
     e.preventDefault();
     win.hide();
     if (!trayNoticeShown && Notification.isSupported()) {
@@ -493,7 +503,22 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 else app.on("second-instance", showWindow);
 
+// The login entry is the only source of truth. If the user removed it outside the app (e.g. KDE's
+// Autostart settings), record that instead of ever writing it back; if the option is off, clear any
+// entry an older version may have left behind.
+function reconcileLaunchAtLogin() {
+  try {
+    const ui = readUi();
+    const exists = loginEntryExists();
+    if (ui.launchAtLogin === true && !exists) fs.writeFileSync(UI_FILE, JSON.stringify({ ...ui, launchAtLogin: false }));
+    else if (ui.launchAtLogin !== true && exists) setLaunchAtLogin(false);
+  } catch (err) { console.warn("launch at login", err.message); }
+}
+
 app.whenReady().then(() => {
+  reconcileLaunchAtLogin();
+  // Started by a login entry the user no longer wants (left by an older version): don't run at all.
+  if (process.argv.includes("--hidden") && readUi().launchAtLogin !== true) { quitting = true; app.quit(); return; }
   loadRegistry();
   ensureData(botDir("default"));
   createWindow();
@@ -504,4 +529,5 @@ app.whenReady().then(() => {
 });
 
 app.on("before-quit", () => { quitting = true; for (const p of procs.values()) p.kill(); for (const id of [...chats.keys()]) stopChat(id); });
-app.on("window-all-closed", () => { if (quitting || !tray) app.quit(); });
+// Closing the window quits (stopping every bot) unless "Keep running in the tray" is on.
+app.on("window-all-closed", () => { if (quitting || !tray || !keepInTray()) app.quit(); });

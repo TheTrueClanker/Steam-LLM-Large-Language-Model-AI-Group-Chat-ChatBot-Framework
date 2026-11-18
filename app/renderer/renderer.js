@@ -548,7 +548,7 @@ api.onUpdateProgress(({ got, total }) => {
   bots = await api.listBots();
   if (ui.lastBot && bots.some((b) => b.id === ui.lastBot)) botId = ui.lastBot;
   await selectBot(botId);
-  $("optTray").checked = ui.closeToTray !== false;
+  $("optTray").checked = ui.closeToTray === true;
   $("optLogin").checked = !!ui.launchAtLogin;
   checkUpdates();
   if (!ui.wizardSeen && !cfg["Steam account name"]) openWizard();

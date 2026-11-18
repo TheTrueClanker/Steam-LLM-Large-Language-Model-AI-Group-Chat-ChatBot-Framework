@@ -26,6 +26,19 @@ What v2.2.2 does:
 - Bots started by the desktop app stop themselves when the app goes away. The playground `/exit` unloads models too.
 - The app shows a one-time notice when closing the window leaves it running in the tray, and the Ollama tab lists what is loaded (RAM/GPU) with a "Free model memory" button and a note that Ollama is its own service that starts at boot on Linux (`sudo systemctl disable --now ollama` to stop that).
 
+## Autostart and Background Running (v2.2.2)
+
+Moto also reported that the app autostarted without being asked and turned itself back on after being turned off. What was wrong:
+
+- "Keep running in the tray when the window is closed" was on by default, so clicking X only hid the window; the app and its bots kept running and looked like they had come back on their own.
+- The "Open the app when I log in" entry was only ever removed by unticking the box in the app. If it was removed or switched off in the desktop's own autostart settings, the app still showed it as on, and an entry left by an older build was never cleaned up.
+
+What v2.2.2 does:
+
+- Everything that runs in the background is opt-in and off by default: tray mode, starting bots when the app opens, and opening the app at login. With them off, closing the window quits the app and stops every bot.
+- At startup the app checks the real login entry. If it was removed or disabled outside the app (`Hidden=true`, `X-GNOME-Autostart-enabled=false`), the setting is turned off and the entry is never written back. If the setting is off, any leftover entry is deleted, and an app started by such an entry quits immediately.
+- The app never installs or enables services. The systemd unit is a template that only runs if the user installs and enables it. Ollama's own boot service comes from Ollama's installer, not from this project.
+
 ## 1. Ollama, Model, and Image Improvements
 
 - Added a centralized Ollama client with:
