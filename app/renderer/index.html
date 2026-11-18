@@ -105,6 +105,10 @@
         <button id="ollamaRefresh">Refresh</button>
         <button id="ollamaDownload">Download Ollama</button>
       </div>
+      <h3>Loaded in memory now</h3>
+      <ul id="loadedList"></ul>
+      <div class="row"><button id="ollamaFree">Free model memory</button><span id="freeMsg" class="msg"></span></div>
+      <p class="hint">Ollama is a separate background program. On Linux its installer sets it up as a system service that starts with the computer; it uses almost no memory until a model is loaded. The bot unloads its models when it stops and keeps them under the "Model memory limit" setting while it runs. To stop Ollama starting at boot: <code>sudo systemctl disable --now ollama</code> (then start it yourself with <code>ollama serve</code> when you need it).</p>
       <h3>Installed models</h3>
       <ul id="modelList"></ul>
       <h3>Pull a model</h3>

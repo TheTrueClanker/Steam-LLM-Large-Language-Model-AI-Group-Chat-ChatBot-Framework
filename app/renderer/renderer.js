@@ -351,8 +351,24 @@ async function refreshOllama() {
   $("ollamaStatus").textContent = res.ok ? `Ollama running at ${ollamaUrl()}` : "Ollama not reachable";
   $("ollamaStatus").className = "pill " + (res.ok ? "ok" : "bad");
   $("modelList").replaceChildren(...(installed.length ? installed : ["(none installed)"]).map((m) => el("li", { textContent: m })));
+  await refreshLoaded();
   return res;
 }
+
+const gb = (bytes) => (bytes / 1024 ** 3).toFixed(1) + " GB";
+async function refreshLoaded() {
+  const res = await api.ollamaLoaded(ollamaUrl());
+  const items = !res.ok ? ["(Ollama not reachable)"] : res.models.length
+    ? res.models.map((m) => `${m.name}: ${gb(m.ram)} RAM${m.vram ? `, ${gb(m.vram)} GPU` : ""}`)
+    : ["(nothing loaded)"];
+  $("loadedList").replaceChildren(...items.map((t) => el("li", { textContent: t })));
+}
+
+$("ollamaFree").onclick = async () => {
+  const res = await api.ollamaFree(ollamaUrl());
+  $("freeMsg").textContent = res.ok ? `Freed ${res.freed} model${res.freed === 1 ? "" : "s"}.` : res.error;
+  await refreshLoaded();
+};
 
 $("ollamaRefresh").onclick = refreshOllama;
 $("ollamaDownload").onclick = () => api.openLink("https://ollama.com/download");
@@ -532,7 +548,7 @@ api.onUpdateProgress(({ got, total }) => {
   bots = await api.listBots();
   if (ui.lastBot && bots.some((b) => b.id === ui.lastBot)) botId = ui.lastBot;
   await selectBot(botId);
-  $("optTray").checked = ui.closeToTray !== false;
+  $("optTray").checked = ui.closeToTray === true;
   $("optLogin").checked = !!ui.launchAtLogin;
   checkUpdates();
   if (!ui.wizardSeen && !cfg["Steam account name"]) openWizard();

@@ -1,6 +1,6 @@
 "use strict";
 
-const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification } = require("electron");
 const os = require("os");
 const { spawn } = require("child_process");
 const fs = require("fs");
@@ -22,6 +22,7 @@ const UI_FILE = path.join(USER_DIR, "ui.json");
 let win = null;
 let tray = null;
 let quitting = false;
+let trayNoticeShown = false;
 const procs = new Map(); // bot id -> running bot.js
 const chats = new Map(); // bot id -> test-chat process (bot.js --playground)
 
@@ -100,10 +101,14 @@ function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
+// The bot process itself stays small (well under 200 MB); cap its heap so a bug can never let it eat the computer.
+const BOT_NODE_FLAGS = ["--max-old-space-size=512"];
+
 function botEnv(dir) {
   return {
     ...process.env,
     ELECTRON_RUN_AS_NODE: "1",
+    STEAM_BOT_GUI: "1",
     STEAM_BOT_DATA_DIR: dir,
     NODE_PATH: path.join(__dirname, "node_modules"),
   };
@@ -162,16 +167,26 @@ ipcMain.handle("link:open", (_e, url) => {
 
 /* ---------- UI preferences (theme, background behaviour) ---------- */
 const readUi = () => { try { return JSON.parse(fs.readFileSync(UI_FILE, "utf8")); } catch { return {}; } };
-ipcMain.handle("ui:get", () => ({ closeToTray: true, ...readUi() }));
+// Nothing runs in the background unless the user turned it on: the tray and login options default to off.
+const keepInTray = () => readUi().closeToTray === true;
+ipcMain.handle("ui:get", () => ({ ...readUi(), closeToTray: keepInTray(), launchAtLogin: loginEntryExists() }));
 ipcMain.handle("ui:set", (_e, patch) => {
   fs.writeFileSync(UI_FILE, JSON.stringify({ ...readUi(), ...patch }));
   if ("launchAtLogin" in patch) setLaunchAtLogin(!!patch.launchAtLogin);
 });
 
 // Windows/macOS use Electron's login items; Linux uses an XDG autostart entry.
+const LOGIN_FILE = path.join(os.homedir(), ".config", "autostart", "steam-llm-chatbot.desktop");
+function loginEntryExists() {
+  if (process.platform === "linux") {
+    // Desktop settings may switch an entry off without deleting it; treat that as off.
+    try { return !/^(Hidden\s*=\s*true|X-GNOME-Autostart-enabled\s*=\s*false)\s*$/im.test(fs.readFileSync(LOGIN_FILE, "utf8")); } catch { return false; }
+  }
+  return app.getLoginItemSettings({ args: ["--hidden"] }).openAtLogin;
+}
 function setLaunchAtLogin(on) {
   if (process.platform === "linux") {
-    const file = path.join(os.homedir(), ".config", "autostart", "steam-llm-chatbot.desktop");
+    const file = LOGIN_FILE;
     if (!on) return fs.rmSync(file, { force: true });
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const exe = process.env.APPIMAGE || process.execPath;
@@ -272,7 +287,7 @@ function startBot(id) {
     }
   }
 
-  const bot = spawn(process.execPath, [path.join(BOT_SRC, "bot.js")], { cwd: dir, env: botEnv(dir) });
+  const bot = spawn(process.execPath, [...BOT_NODE_FLAGS, path.join(BOT_SRC, "bot.js")], { cwd: dir, env: botEnv(dir) });
   procs.set(id, bot);
   bot.stdin.on("error", () => {}); // EPIPE if the bot exits between our write and its close
   let closePressed = false;
@@ -313,7 +328,7 @@ function startChat(id) {
   if (chats.has(id)) return chats.get(id);
   const dir = botDir(id);
   ensureData(dir);
-  const proc = spawn(process.execPath, [path.join(BOT_SRC, "bot.js"), "--playground"], { cwd: dir, env: botEnv(dir) });
+  const proc = spawn(process.execPath, [...BOT_NODE_FLAGS, path.join(BOT_SRC, "bot.js"), "--playground"], { cwd: dir, env: botEnv(dir) });
   const chat = { proc };
   chats.set(id, chat);
   proc.stdin.on("error", () => {});
@@ -356,6 +371,26 @@ ipcMain.handle("ollama:tags", async (_e, url) => {
     const res = await fetch(new URL("/api/tags", url), { signal: AbortSignal.timeout(3000) });
     const json = await res.json();
     return { ok: true, models: (json.models || []).map((m) => m.name) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+// What Ollama has loaded and how much RAM it takes. Ollama is its own background program (on Linux its installer
+// adds a system service that starts with the computer), so this is shown separately from the bots.
+ipcMain.handle("ollama:loaded", async (_e, url) => {
+  try {
+    const res = await fetch(new URL("/api/ps", url), { signal: AbortSignal.timeout(3000) });
+    const json = await res.json();
+    return { ok: true, models: (json.models || []).map((m) => ({ name: m.name || m.model, ram: Math.max(0, (m.size || 0) - (m.size_vram || 0)), vram: m.size_vram || 0 })) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+ipcMain.handle("ollama:free", async (_e, url) => {
+  try {
+    const n = await lib("ollama").createOllama({ url }).unloadEverything();
+    return { ok: true, freed: n };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -435,9 +470,13 @@ function createWindow() {
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
   // Closing the window keeps the bots running in the tray (turn off in the header menu).
   win.on("close", (e) => {
-    if (quitting || !tray || readUi().closeToTray === false) return;
+    if (quitting || !tray || !keepInTray()) return;
     e.preventDefault();
     win.hide();
+    if (!trayNoticeShown && Notification.isSupported()) {
+      trayNoticeShown = true;
+      new Notification({ title: "Steam LLM Chatbot is still running", body: procs.size ? "Your bots keep running in the tray. Right-click the tray icon and choose Quit to stop everything." : "It is in the tray. Right-click the tray icon and choose Quit to close it completely." }).show();
+    }
   });
 }
 
@@ -464,7 +503,22 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 else app.on("second-instance", showWindow);
 
+// The login entry is the only source of truth. If the user removed it outside the app (e.g. KDE's
+// Autostart settings), record that instead of ever writing it back; if the option is off, clear any
+// entry an older version may have left behind.
+function reconcileLaunchAtLogin() {
+  try {
+    const ui = readUi();
+    const exists = loginEntryExists();
+    if (ui.launchAtLogin === true && !exists) fs.writeFileSync(UI_FILE, JSON.stringify({ ...ui, launchAtLogin: false }));
+    else if (ui.launchAtLogin !== true && exists) setLaunchAtLogin(false);
+  } catch (err) { console.warn("launch at login", err.message); }
+}
+
 app.whenReady().then(() => {
+  reconcileLaunchAtLogin();
+  // Started by a login entry the user no longer wants (left by an older version): don't run at all.
+  if (process.argv.includes("--hidden") && readUi().launchAtLogin !== true) { quitting = true; app.quit(); return; }
   loadRegistry();
   ensureData(botDir("default"));
   createWindow();
@@ -475,4 +529,5 @@ app.whenReady().then(() => {
 });
 
 app.on("before-quit", () => { quitting = true; for (const p of procs.values()) p.kill(); for (const id of [...chats.keys()]) stopChat(id); });
-app.on("window-all-closed", () => { if (quitting || !tray) app.quit(); });
+// Closing the window quits (stopping every bot) unless "Keep running in the tray" is on.
+app.on("window-all-closed", () => { if (quitting || !tray || !keepInTray()) app.quit(); });

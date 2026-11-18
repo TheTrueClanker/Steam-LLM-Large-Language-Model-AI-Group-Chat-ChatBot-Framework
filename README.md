@@ -71,7 +71,7 @@ The wizard can be reopened from the Dashboard. Every setting remains editable fr
 - **Multiple bots:** each bot has a separate account, config, persona, memory, logs, and process. The app prevents two running bots from sharing one Steam account.
 - **Test chat:** run the real persona, thinking, vision, and action-tag pipeline as either a DM or group chat without logging into Steam or touching memory.
 - **Persona writer:** generate or improve the system prompt and personality with an installed model. Generated text is placed in the editor for review and never changes the masters section.
-- **Background operation:** keep bots running in the system tray, auto-start selected bots when the app opens, and optionally launch the app at OS login.
+- **Background operation (all opt-in, off by default):** keep bots running in the system tray after the window is closed, auto-start selected bots when the app opens, and launch the app at OS login. With these off, closing the window quits the app and stops every bot.
 - **Themes:** Dark, Light, Steam, Yuki's Theme, industrial FD-orange/white/metallic-silver Fergus Dynamics, Sakura, and High contrast.
 - **Updates:** check releases, review the release page, and explicitly confirm before downloading or installing anything.
 

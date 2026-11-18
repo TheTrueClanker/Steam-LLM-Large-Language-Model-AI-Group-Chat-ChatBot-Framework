@@ -64,7 +64,7 @@ if not exist "node_modules\steam-user\package.json" (
 )
 
 echo Starting bot...
-node bot.js
+node --max-old-space-size=512 bot.js
 set "BOT_EXIT=%ERRORLEVEL%"
 
 rem Exit code 20 means bot.js already explained a Steam startup/login

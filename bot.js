@@ -5,7 +5,7 @@ const readline = require("readline/promises");
 const { stdin, stdout } = require("process");
 const fs = require("fs");
 const path = require("path");
-const { createOllama, parseThinkSetting } = require("./lib/ollama");
+const { createOllama, parseThinkSetting, parseMemoryAmount } = require("./lib/ollama");
 const { bbcodeToPlain, extractImageUrls, isMentioned } = require("./lib/steam-text");
 const { fetchImages } = require("./lib/images");
 const { extractInvites } = require("./lib/steam-text");
@@ -259,22 +259,34 @@ const VISION_ENABLED = humanConfigBool("Vision", true);
 const VISION_MODEL = String(humanConfig("Vision model", "")).trim();
 const VISION_MAX_IMAGES = Math.max(1, Number(humanConfig("Max images per message", 3)) || 3);
 const VISION_ALLOW_ANY_HOST = humanConfigBool("Allow any image host", false);
-const OLLAMA_NUM_CTX = Number(humanConfig("Context size", "")) || 0;
-// "Model memory limit": auto = half of this computer's RAM when Ollama runs here (unlimited for a remote Ollama),
-// a number = that many GB, off/0 = never unload models to make room.
-function resolveModelMemoryLimitBytes() {
-  const raw = String(humanConfig("Model memory limit", "auto")).trim().toLowerCase();
-  if (["off", "no", "false", "none", "0"].includes(raw)) return 0;
-  const gb = Number(raw.replace(/gb?$/, ""));
-  if (raw && raw !== "auto" && Number.isFinite(gb) && gb > 0) return Math.round(gb * 1024 ** 3);
-  let host = "";
-  try { host = new URL(OLLAMA_URL).hostname; } catch {}
-  return ["127.0.0.1", "localhost", "[::1]", "::1"].includes(host) ? Math.round(require("os").totalmem() * 0.5) : 0;
+// Older config files have no "Context size" line; Ollama's own default is often 32768 tokens, which can take several GB
+// on top of the model. Default to 8192 (plenty for chat); "auto"/"0" leaves it to Ollama.
+const OLLAMA_NUM_CTX = (() => {
+  const raw = String(humanConfig("Context size", "8192")).trim().toLowerCase();
+  if (raw === "auto" || raw === "0") return 0;
+  return Number(raw) > 0 ? Math.round(Number(raw)) : 8192;
+})();
+// "Model memory limit": hard cap on the RAM all loaded models may use together. auto = 35% of this computer's RAM when
+// Ollama runs here (unlimited for a remote Ollama); also 12 / 12GB / 512MB / 40%; off = no cap.
+const OLLAMA_IS_LOCAL = (() => {
+  try { return ["127.0.0.1", "localhost", "[::1]", "::1"].includes(new URL(OLLAMA_URL).hostname); } catch { return false; }
+})();
+function resolveMemorySetting(key, fallback, auto) {
+  const raw = humanConfig(key, fallback);
+  const bytes = parseMemoryAmount(raw, { auto });
+  if (bytes !== null) return bytes;
+  const safe = parseMemoryAmount(fallback, { auto });
+  logConsole(`[config] "${key} = ${raw}" is not a size I understand (use auto, off, a number of GB like 8, 512MB, or 30%); using ${fallback}.`);
+  return safe;
 }
+const MODEL_MEMORY_LIMIT_BYTES = resolveMemorySetting("Model memory limit", "auto", OLLAMA_IS_LOCAL ? Math.round(require("os").totalmem() * 0.35) : 0);
+// "Low memory guard": when the computer has less free memory than this, models are unloaded and replies wait.
+const LOW_MEMORY_GUARD_BYTES = OLLAMA_IS_LOCAL ? resolveMemorySetting("Low memory guard", "auto", Math.max(1024 ** 3, Math.round(require("os").totalmem() * 0.1))) : 0;
 const ollama = createOllama({
   numCtx: OLLAMA_NUM_CTX,
-  keepAlive: String(humanConfig("Keep model loaded", "5m")).trim() || "5m",
-  memoryLimitBytes: resolveModelMemoryLimitBytes(),
+  keepAlive: String(humanConfig("Keep model loaded", "2m")).trim() || "2m",
+  memoryLimitBytes: MODEL_MEMORY_LIMIT_BYTES,
+  minFreeBytes: LOW_MEMORY_GUARD_BYTES,
   url: OLLAMA_URL,
   log: (...parts) => logConsole(...parts),
   defaultTimeoutMs: OLLAMA_REPLY_TIMEOUT_MS
@@ -7077,7 +7089,7 @@ function runPlaygroundV9() {
   rl.on("line", line => {
     const text = line.trim();
     if (!text) return;
-    if (text === "/exit" || text === "/quit") { rl.close(); process.exit(0); }
+    if (text === "/exit" || text === "/quit") { rl.close(); shutdownV9("playground exit").catch(() => process.exit(0)); return; }
     let req;
     let json = false;
     if (text.startsWith("{")) {
@@ -7141,6 +7153,15 @@ async function shutdownV9(reason, exitCode = 0) {
 
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
   process.on(signal, () => { shutdownV9(signal).catch(() => process.exit(1)); });
+}
+// Started by the desktop app: its pipe closes when the app exits or crashes. Stop too, so no bot is left running
+// (and holding models in memory) with no window to stop it from.
+if (process.env.STEAM_BOT_GUI === "1") {
+  process.stdin.on("end", () => { shutdownV9("desktop app closed").catch(() => process.exit(0)); });
+  const parent = process.ppid;
+  setInterval(() => {
+    try { process.kill(parent, 0); } catch { shutdownV9("desktop app gone").catch(() => process.exit(0)); }
+  }, 5000).unref();
 }
 process.on("unhandledRejection", reason => {
   logConsole("[unhandledRejection]", reason instanceof Error ? reason.stack || reason.message : safeString(reason));

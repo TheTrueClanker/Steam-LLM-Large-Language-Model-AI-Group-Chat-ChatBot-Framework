@@ -43,14 +43,18 @@ Max images per message = 3
 Allow any image host = off
 # Memory: how long a model stays loaded in RAM/VRAM after its last use (5m, 30s, 0 = free it right away, -1 = never).
 # Lower it if your computer starts swapping.
-Keep model loaded = 5m
-# Most memory the bot's models may use together: auto (half of this computer's RAM), a number of GB (e.g. 12), or off.
-# Models that fit stay loaded, so replies are fast and nothing is reloaded every turn. When a new model does not fit,
-# the one used longest ago is unloaded. Lower it if your computer swaps.
+Keep model loaded = 2m
+# Hard cap on the RAM that loaded models may use together (counts everything Ollama has loaded, context included):
+# auto (35% of this computer's RAM), a number of GB (e.g. 6), 512MB, a percentage (e.g. 25%), or off.
+# Models that fit stay loaded so replies stay fast. When a new one does not fit, the one used longest ago is unloaded;
+# a model too big for the cap on its own is refused (the console says so) instead of being loaded.
 Model memory limit = auto
+# When the computer has less free memory than this, the bot unloads its models and waits instead of loading one:
+# auto (10% of RAM, at least 1 GB), a number of GB, a percentage, or off.
+Low memory guard = auto
 # Free this bot's models when it exits.
 Unload models on exit = on
-# Context window in tokens (blank = Ollama's default, which on some models is 32768+ and uses a lot of memory). 8192 is plenty for chat.
+# Context window in tokens (default 8192, plenty for chat; auto = Ollama's default, which on some models is 32768+ and uses several GB more).
 Context size = 8192
 # Give up on a stuck model after this many seconds.
 Reply timeout seconds = 180
